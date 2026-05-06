@@ -22,6 +22,15 @@ const PortName = "grpc"
 
 var nameRegex = regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,63}$")
 
+// Namer transforms a resource's logical id into the cache name it is stored
+// under. It mirrors snapshot.Namer; we declare it here as a small interface
+// to avoid an import cycle between snapshot and snapshot/apigateway.
+type Namer interface {
+	Listener(id string) string
+	RouteConfig(id string) string
+	Cluster(id string) string
+}
+
 // FromKubeServices generate
 // - Listener for each API Gateway (xds:///api-gateway-name)
 // - RouteConfiguration for those listeners
@@ -29,8 +38,13 @@ var nameRegex = regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,63}$")
 // The service must have the following annotations:
 // xds.lmwn.com/api-gateway: Comma-separated list of API Gateway virtual servers. Only alphanumeric characters and dash allowed
 // xds.lmwn.com/grpc-service: Comma-separated list of gRPC fully qualified service name (pkg.name.ServiceName)
-// and the service must have a port named "grpc"f
-func FromKubeServices(services []*v1.Service) ([]types.Resource, map[string]int) {
+// and the service must have a port named "grpc"
+//
+// All emitted names and inter-resource references go through namer so the
+// resulting set is self-consistent under one naming namespace (legacy or
+// xdstp). Stats are keyed by the original (unprefixed) gateway name so that
+// metric labels stay stable across name spaces.
+func FromKubeServices(services []*v1.Service, namer Namer) ([]types.Resource, map[string]int) {
 	routerConfigs := map[string]*routev3.RouteConfiguration{}
 	gateways := map[string]*listenerv3.Listener{}
 
@@ -68,17 +82,19 @@ outer:
 			continue
 		}
 
+		clusterName := namer.Cluster(fmt.Sprintf("%s.%s:%s", svc.Name, svc.Namespace, PortName))
+
 		for _, gateway := range apiGateways {
 			if _, ok = gateways[gateway]; !ok {
 				gateways[gateway] = &listenerv3.Listener{
-					Name: gateway,
+					Name: namer.Listener(gateway),
 				}
 			}
 
 			routeConfig, ok := routerConfigs[gateway]
 			if !ok {
 				routeConfig = &routev3.RouteConfiguration{
-					Name: gateway,
+					Name: namer.RouteConfig(gateway),
 					VirtualHosts: []*routev3.VirtualHost{
 						{
 							Name:    gateway,
@@ -100,7 +116,7 @@ outer:
 					Action: &routev3.Route_Route{
 						Route: &routev3.RouteAction{
 							ClusterSpecifier: &routev3.RouteAction_Cluster{
-								Cluster: fmt.Sprintf("%s.%s:%s", svc.Name, svc.Namespace, PortName),
+								Cluster: clusterName,
 							},
 						},
 					},
@@ -132,7 +148,7 @@ outer:
 		}
 
 		out = append(out, gateway)
-		stats[gateway.Name] = len(routerConfigs[name].VirtualHosts[0].Routes)
+		stats[name] = len(routerConfigs[name].VirtualHosts[0].Routes)
 	}
 
 	for _, route := range routerConfigs {
