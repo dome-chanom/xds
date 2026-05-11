@@ -130,9 +130,9 @@ func kubeServicesToResources(services []*corev1.Service, namer Namer) []types.Re
 			targetHostPort := net.JoinHostPort(fullName, port.Name)
 			targetHostPortNumber := net.JoinHostPort(fullName, strconv.Itoa(int(port.Port)))
 
-			listenerName := namer.Listener(targetHostPortNumber)
-			routeConfigName := namer.RouteConfig(targetHostPortNumber)
-			clusterName := namer.Cluster(targetHostPort)
+			listenerName := namer.NameListener(targetHostPortNumber)
+			routeConfigName := namer.NameRouteConfig(targetHostPortNumber)
+			clusterName := namer.NameCluster(targetHostPort)
 
 			routeConfig := &routev3.RouteConfiguration{
 				Name: routeConfigName,
@@ -189,7 +189,7 @@ func kubeServicesToResources(services []*corev1.Service, namer Namer) []types.Re
 							Ads: &corev3.AggregatedConfigSource{},
 						},
 					},
-					ServiceName: namer.Endpoint(targetHostPort),
+					ServiceName: namer.NameEndpoint(targetHostPort),
 				},
 			}
 

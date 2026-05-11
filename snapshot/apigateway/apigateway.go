@@ -22,13 +22,13 @@ const PortName = "grpc"
 
 var nameRegex = regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,63}$")
 
-// Namer transforms a resource's logical id into the cache name it is stored
-// under. It mirrors snapshot.Namer; we declare it here as a small interface
-// to avoid an import cycle between snapshot and snapshot/apigateway.
+// Namer transforms a resource's logical id into the wire-level name it is
+// emitted under. It mirrors snapshot.Namer; we declare it here as a small
+// interface to avoid an import cycle between snapshot and snapshot/apigateway.
 type Namer interface {
-	Listener(id string) string
-	RouteConfig(id string) string
-	Cluster(id string) string
+	NameListener(id string) string
+	NameRouteConfig(id string) string
+	NameCluster(id string) string
 }
 
 // FromKubeServices generate
@@ -41,7 +41,7 @@ type Namer interface {
 // and the service must have a port named "grpc"
 //
 // All emitted names and inter-resource references go through namer so the
-// resulting set is self-consistent under one naming namespace (legacy or
+// resulting set is self-consistent under one naming namespace (local or
 // xdstp). Stats are keyed by the original (unprefixed) gateway name so that
 // metric labels stay stable across name spaces.
 func FromKubeServices(services []*v1.Service, namer Namer) ([]types.Resource, map[string]int) {
@@ -82,19 +82,19 @@ outer:
 			continue
 		}
 
-		clusterName := namer.Cluster(fmt.Sprintf("%s.%s:%s", svc.Name, svc.Namespace, PortName))
+		clusterName := namer.NameCluster(fmt.Sprintf("%s.%s:%s", svc.Name, svc.Namespace, PortName))
 
 		for _, gateway := range apiGateways {
 			if _, ok = gateways[gateway]; !ok {
 				gateways[gateway] = &listenerv3.Listener{
-					Name: namer.Listener(gateway),
+					Name: namer.NameListener(gateway),
 				}
 			}
 
 			routeConfig, ok := routerConfigs[gateway]
 			if !ok {
 				routeConfig = &routev3.RouteConfiguration{
-					Name: namer.RouteConfig(gateway),
+					Name: namer.NameRouteConfig(gateway),
 					VirtualHosts: []*routev3.VirtualHost{
 						{
 							Name:    gateway,

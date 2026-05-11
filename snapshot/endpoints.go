@@ -96,7 +96,7 @@ func sliceToEndpoints(s []interface{}) []*corev1.Endpoints { //nolint:staticchec
 }
 
 // kubeEndpointsToResources convert list of Kubernetes endpoints to Endpoint
-// (ClusterLoadAssignment), naming each CLA via namer.Endpoint so the names
+// (ClusterLoadAssignment), naming each CLA via namer.NameEndpoint so the names
 // match the corresponding Cluster names emitted under the same namer.
 func (s *Snapshotter) kubeEndpointsToResources(endpoints []*corev1.Endpoints, namer Namer) []types.Resource { //nolint:staticcheck // We use deprecated API to support legacy Kubernetes
 	var out []types.Resource
@@ -114,7 +114,7 @@ func (s *Snapshotter) kubeEndpointToResources(ep *corev1.Endpoints, namer Namer)
 		klog.Errorf("fail to get object key: %s", err)
 		return nil
 	}
-	cacheKey := namer.CacheKey(name)
+	cacheKey := namer.Scope() + ":" + name
 	if val, ok := s.endpointResourceCache[cacheKey]; ok && val.version == ep.ResourceVersion {
 		return val.resources
 	}
@@ -131,7 +131,7 @@ func (s *Snapshotter) kubeEndpointToResources(ep *corev1.Endpoints, namer Namer)
 			}
 
 			cla := &endpointv3.ClusterLoadAssignment{
-				ClusterName: namer.Endpoint(portName),
+				ClusterName: namer.NameEndpoint(portName),
 				Endpoints: []*endpointv3.LocalityLbEndpoints{
 					{
 						LoadBalancingWeight: wrapperspb.UInt32(1),

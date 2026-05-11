@@ -41,11 +41,11 @@ func indexCLAs(t *testing.T, resources []types.Resource) map[string]*endpointv3.
 	return out
 }
 
-func TestKubeEndpointToResources_LegacyNamer(t *testing.T) {
+func TestKubeEndpointToResources_LocalNamer(t *testing.T) {
 	s := newSnapshotterForTest()
 	ep := makeEndpoints("foo", "default", "10.0.0.1", "grpc", 50051)
 
-	resources := s.kubeEndpointToResources(ep, LegacyNamer())
+	resources := s.kubeEndpointToResources(ep, LocalNamer())
 
 	clas := indexCLAs(t, resources)
 	require.Contains(t, clas, "foo.default:grpc")
@@ -74,28 +74,28 @@ func TestKubeEndpointToResources_XDSTPNamer(t *testing.T) {
 	assert.Equal(t, "10.0.0.1", cla.Endpoints[0].LbEndpoints[0].GetEndpoint().Address.GetSocketAddress().Address)
 }
 
-func TestKubeEndpointToResources_DualEmission_CacheKeyDistinct(t *testing.T) {
+func TestKubeEndpointToResources_DualEmission_DistinctEntries(t *testing.T) {
 	s := newSnapshotterForTest()
 	ep := makeEndpoints("foo", "default", "10.0.0.1", "grpc", 50051)
 
-	legacy := s.kubeEndpointToResources(ep, LegacyNamer())
+	local := s.kubeEndpointToResources(ep, LocalNamer())
 	xdstp := s.kubeEndpointToResources(ep, XDSTPNamer("alpha"))
 
 	// Both emissions must produce a CLA — the per-endpoint cache must not
 	// collapse them into one despite sharing the same Kubernetes object.
-	require.Len(t, legacy, 1)
+	require.Len(t, local, 1)
 	require.Len(t, xdstp, 1)
 
-	legacyCLA := legacy[0].(*endpointv3.ClusterLoadAssignment)
+	localCLA := local[0].(*endpointv3.ClusterLoadAssignment)
 	xdstpCLA := xdstp[0].(*endpointv3.ClusterLoadAssignment)
 
-	assert.Equal(t, "foo.default:grpc", legacyCLA.ClusterName)
+	assert.Equal(t, "foo.default:grpc", localCLA.ClusterName)
 	assert.Equal(t, "xdstp://alpha/envoy.config.endpoint.v3.ClusterLoadAssignment/foo.default:grpc", xdstpCLA.ClusterName)
 
 	// Endpoint payload (the actual addresses) must be identical between the
 	// two emissions — they represent the same backend pods.
 	assert.Equal(t,
-		legacyCLA.Endpoints[0].LbEndpoints[0].GetEndpoint().Address.GetSocketAddress().Address,
+		localCLA.Endpoints[0].LbEndpoints[0].GetEndpoint().Address.GetSocketAddress().Address,
 		xdstpCLA.Endpoints[0].LbEndpoints[0].GetEndpoint().Address.GetSocketAddress().Address,
 	)
 }
@@ -104,8 +104,8 @@ func TestKubeEndpointToResources_CacheReuseOnSameNamerAndVersion(t *testing.T) {
 	s := newSnapshotterForTest()
 	ep := makeEndpoints("foo", "default", "10.0.0.1", "grpc", 50051)
 
-	first := s.kubeEndpointToResources(ep, LegacyNamer())
-	second := s.kubeEndpointToResources(ep, LegacyNamer())
+	first := s.kubeEndpointToResources(ep, LocalNamer())
+	second := s.kubeEndpointToResources(ep, LocalNamer())
 
 	// Same object, same version, same namer → cache returns the same slice
 	// header. (The cache exists to avoid re-marshalling identical state.)

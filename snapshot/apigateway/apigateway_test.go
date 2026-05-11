@@ -50,9 +50,9 @@ func splitByType(resources []types.Resource) (map[string]*listenerv3.Listener, m
 	return listeners, routes
 }
 
-func TestFromKubeServices_LegacyNamer(t *testing.T) {
+func TestFromKubeServices_LocalNamer(t *testing.T) {
 	svc := makeApigwService("backend", "default", "apigw1", "pkg.Service")
-	resources, stats := apigateway.FromKubeServices([]*corev1.Service{svc}, snapshot.LegacyNamer())
+	resources, stats := apigateway.FromKubeServices([]*corev1.Service{svc}, snapshot.LocalNamer())
 
 	listeners, routes := splitByType(resources)
 

@@ -43,7 +43,7 @@ func waitForSnapshot(t *testing.T, c cache.SnapshotCache, expectedNames ...strin
 	return nil
 }
 
-func TestSnapshotter_DualEmission_StoresBothLegacyAndXDSTPResources(t *testing.T) {
+func TestSnapshotter_DualEmission_StoresBothLocalAndXDSTPResources(t *testing.T) {
 	kubeSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
 		Spec: corev1.ServiceSpec{
@@ -69,7 +69,7 @@ func TestSnapshotter_DualEmission_StoresBothLegacyAndXDSTPResources(t *testing.T
 
 	go func() { _ = s.Start(ctx) }()
 
-	const legacyListener = "foo.default:50051"
+	const localListener = "foo.default:50051"
 	const xdstpListener = "xdstp://alpha/envoy.config.listener.v3.Listener/foo.default:50051"
 
 	mux := s.MuxCache()
@@ -77,10 +77,10 @@ func TestSnapshotter_DualEmission_StoresBothLegacyAndXDSTPResources(t *testing.T
 
 	// Pull the underlying services cache so we can poll for the snapshot.
 	servicesCache := s.servicesCache
-	snap := waitForSnapshot(t, servicesCache, legacyListener, xdstpListener)
+	snap := waitForSnapshot(t, servicesCache, localListener, xdstpListener)
 
 	listeners := snap.GetResources(resource.ListenerType)
-	assert.Contains(t, listeners, legacyListener)
+	assert.Contains(t, listeners, localListener)
 	assert.Contains(t, listeners, xdstpListener)
 
 	clusters := snap.GetResources(resource.ClusterType)
@@ -89,13 +89,13 @@ func TestSnapshotter_DualEmission_StoresBothLegacyAndXDSTPResources(t *testing.T
 
 	// Both clusters MUST have ServiceName set so gRPC's xDS client accepts
 	// new-style names. Verify the value matches the matching CLA name.
-	legacyCluster := clusters["foo.default:grpc"].(*clusterv3.Cluster)
+	localCluster := clusters["foo.default:grpc"].(*clusterv3.Cluster)
 	xdstpCluster := clusters["xdstp://alpha/envoy.config.cluster.v3.Cluster/foo.default:grpc"].(*clusterv3.Cluster)
-	assert.Equal(t, "foo.default:grpc", legacyCluster.EdsClusterConfig.ServiceName)
+	assert.Equal(t, "foo.default:grpc", localCluster.EdsClusterConfig.ServiceName)
 	assert.Equal(t, "xdstp://alpha/envoy.config.endpoint.v3.ClusterLoadAssignment/foo.default:grpc", xdstpCluster.EdsClusterConfig.ServiceName)
 }
 
-func TestSnapshotter_LegacyOnlyMode_StoresOnlyLegacyResources(t *testing.T) {
+func TestSnapshotter_LocalOnlyMode_StoresOnlyLocalResources(t *testing.T) {
 	kubeSvc := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
 		Spec: corev1.ServiceSpec{
@@ -111,12 +111,12 @@ func TestSnapshotter_LegacyOnlyMode_StoresOnlyLegacyResources(t *testing.T) {
 
 	go func() { _ = s.Start(ctx) }()
 
-	const legacyListener = "foo.default:50051"
-	snap := waitForSnapshot(t, s.servicesCache, legacyListener)
+	const localListener = "foo.default:50051"
+	snap := waitForSnapshot(t, s.servicesCache, localListener)
 
 	listeners := snap.GetResources(resource.ListenerType)
-	assert.Contains(t, listeners, legacyListener)
+	assert.Contains(t, listeners, localListener)
 	for name := range listeners {
-		assert.NotContains(t, name, "xdstp://", "legacy-only mode must not emit xdstp resources")
+		assert.NotContains(t, name, "xdstp://", "local-only mode must not emit xdstp resources")
 	}
 }

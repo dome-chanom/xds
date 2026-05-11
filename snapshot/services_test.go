@@ -54,9 +54,9 @@ func extractInlineRouteConfig(t *testing.T, l *listenerv3.Listener) *routev3.Rou
 	return rc.RouteConfig
 }
 
-func TestKubeServicesToResources_LegacyNamer(t *testing.T) {
+func TestKubeServicesToResources_LocalNamer(t *testing.T) {
 	svc := makeService("foo", "default", "grpc", 50051)
-	resources := kubeServicesToResources([]*corev1.Service{svc}, LegacyNamer())
+	resources := kubeServicesToResources([]*corev1.Service{svc}, LocalNamer())
 
 	listeners, routes, clusters := indexResources(t, resources)
 
@@ -66,7 +66,7 @@ func TestKubeServicesToResources_LegacyNamer(t *testing.T) {
 
 	assert.Equal(t, "foo.default:grpc", routes["foo.default:50051"].VirtualHosts[0].Routes[0].GetRoute().GetCluster())
 
-	// Legacy clusters get ServiceName == cluster name — same value gRPC would
+	// Local clusters get ServiceName == cluster name — same value gRPC would
 	// default to, just made explicit so the wire format stays uniform with
 	// xdstp emission.
 	assert.Equal(t, "foo.default:grpc", clusters["foo.default:grpc"].EdsClusterConfig.ServiceName)
@@ -116,12 +116,12 @@ func TestBuildServiceResources_DualEmissionContainsBothNameSpaces(t *testing.T) 
 
 	merged, _ := buildServiceResources(
 		[]*corev1.Service{svc},
-		[]Namer{LegacyNamer(), XDSTPNamer("alpha")},
+		[]Namer{LocalNamer(), XDSTPNamer("alpha")},
 	)
 
 	listeners, routes, clusters := indexResources(t, merged)
 
-	// Both legacy and xdstp variants must coexist.
+	// Both local and xdstp variants must coexist.
 	assert.Contains(t, listeners, "foo.default:50051")
 	assert.Contains(t, listeners, "xdstp://alpha/envoy.config.listener.v3.Listener/foo.default:50051")
 	assert.Contains(t, routes, "foo.default:50051")

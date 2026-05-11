@@ -10,9 +10,9 @@ type Config struct {
 
 	// LocalCluster, when non-empty, names the xdstp authority this server is
 	// authoritative for. Resources are then emitted twice: once under their
-	// legacy names (for `xds:///foo` URLs) and once under
+	// bare local names (for `xds:///foo` URLs) and once under
 	// `xdstp://<LocalCluster>/<type>/foo` (for `xds://<LocalCluster>/foo`
-	// URLs). Leave empty to disable xdstp emission and preserve legacy-only
+	// URLs). Leave empty to disable xdstp emission and preserve local-only
 	// behavior.
 	LocalCluster string
 }

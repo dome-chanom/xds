@@ -16,14 +16,12 @@ type xdstpNamer struct {
 	authority string
 }
 
-func (n xdstpNamer) Listener(id string) string    { return n.format(resource.ListenerType, id) }
-func (n xdstpNamer) RouteConfig(id string) string { return n.format(resource.RouteType, id) }
-func (n xdstpNamer) Cluster(id string) string     { return n.format(resource.ClusterType, id) }
-func (n xdstpNamer) Endpoint(id string) string    { return n.format(resource.EndpointType, id) }
+func (n xdstpNamer) NameListener(id string) string    { return n.format(resource.ListenerType, id) }
+func (n xdstpNamer) NameRouteConfig(id string) string { return n.format(resource.RouteType, id) }
+func (n xdstpNamer) NameCluster(id string) string     { return n.format(resource.ClusterType, id) }
+func (n xdstpNamer) NameEndpoint(id string) string    { return n.format(resource.EndpointType, id) }
 
-func (n xdstpNamer) CacheKey(id string) string {
-	return fmt.Sprintf("xdstp://%s/%s", n.authority, id)
-}
+func (n xdstpNamer) Scope() string { return "xdstp:" + n.authority }
 
 // format builds an xdstp resource name. The go-control-plane type constants
 // include a `type.googleapis.com/` prefix; the xdstp spec uses just the proto

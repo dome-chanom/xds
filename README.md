@@ -36,8 +36,8 @@ pods.
 ### Flags
 
 - `--statsinterval=<seconds>` (default `300`): load reporting service stats update interval.
-- `--local-cluster=<name>` (default unset): when set, the server emits each resource under both its legacy name and
-  `xdstp://<name>/...` (gRPC A47 federation). Leave unset for legacy-only emission. See [Federation](#federation-xdstp-authorities) below.
+- `--local-cluster=<name>` (default unset): when set, the server emits each resource under both its bare local name and
+  `xdstp://<name>/...` (gRPC A47 federation). Leave unset for local-only emission. See [Federation](#federation-xdstp-authorities) below.
 
 ### Usage with Nix
 
@@ -129,10 +129,10 @@ ADS streams directly to remote xDS servers when an authority's URL is used.
 #### Server setup
 
 Pass `--local-cluster=<name>` to enable xdstp emission. The server will then emit each resource twice: once under its
-legacy name (for `xds:///foo` URLs) and once under `xdstp://<name>/...` (for `xds://<name>/foo` URLs). The endpoint
+bare local name (for `xds:///foo` URLs) and once under `xdstp://<name>/...` (for `xds://<name>/foo` URLs). The endpoint
 data is identical; the URL form just changes which name the client looks up.
 
-If `--local-cluster` is unset, the server emits only legacy names — current default behavior, no change.
+If `--local-cluster` is unset, the server emits only local names — current default behavior, no change.
 
 #### Client bootstrap
 
@@ -151,7 +151,7 @@ To address multiple clusters, list each authority and point it at the correspond
 
 Then in code:
 
-- `xds:///foo.bar:8080` — legacy URL; resolves via the default `xds_servers`, typically the local cluster's xDS.
+- `xds:///foo.bar:8080` — default-authority URL; resolves via the default `xds_servers`, typically the local cluster's xDS.
 - `xds://alpha/foo.bar:8080` — explicit alpha-cluster endpoints. Resolves via the `alpha` authority's xDS server.
 - `xds://beta/foo.bar:8080` — explicit beta-cluster endpoints. The client opens an ADS stream directly to
   `beta-xds.example.com:5000`.

@@ -46,9 +46,9 @@ type Snapshotter struct {
 	ResyncPeriod time.Duration
 
 	// localCluster, when non-empty, names the xdstp authority this server is
-	// authoritative for. Resources are then emitted under both their legacy
-	// names (for `xds:///foo`) and `xdstp://<localCluster>/<type>/<id>`
-	// (for `xds://<localCluster>/foo`). Empty means legacy-only emission.
+	// authoritative for. Resources are then emitted under both their bare
+	// local names (for `xds:///foo`) and `xdstp://<localCluster>/<type>/<id>`
+	// (for `xds://<localCluster>/foo`). Empty means local-only emission.
 	localCluster string
 
 	client         kubernetes.Interface
@@ -105,15 +105,15 @@ func (s *Snapshotter) MuxCache() *cache.MuxCache {
 }
 
 // namers returns the Namers used to emit resources. When localCluster is
-// empty the snapshotter is in legacy-only mode and emits each resource under
-// its historical name. When localCluster is set, every resource is also
-// emitted under `xdstp://<localCluster>/...` so xdstp federation clients can
-// reach it via `xds://<localCluster>/foo` URLs.
+// empty the snapshotter is in local-only mode and emits each resource under
+// its bare name. When localCluster is set, every resource is also emitted
+// under `xdstp://<localCluster>/...` so xdstp federation clients can reach
+// it via `xds://<localCluster>/foo` URLs.
 func (s *Snapshotter) namers() []Namer {
 	if s.localCluster == "" {
-		return []Namer{LegacyNamer()}
+		return []Namer{LocalNamer()}
 	}
-	return []Namer{LegacyNamer(), XDSTPNamer(s.localCluster)}
+	return []Namer{LocalNamer(), XDSTPNamer(s.localCluster)}
 }
 
 func (s *Snapshotter) Start(stopCtx context.Context) error {
