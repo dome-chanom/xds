@@ -7,6 +7,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wongnai/xds/snapshot/namer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -45,7 +46,7 @@ func TestKubeEndpointToResources_LocalNamer(t *testing.T) {
 	s := newSnapshotterForTest()
 	ep := makeEndpoints("foo", "default", "10.0.0.1", "grpc", 50051)
 
-	resources := s.kubeEndpointToResources(ep, LocalNamer())
+	resources := s.kubeEndpointToResources(ep, namer.LocalNamer())
 
 	clas := indexCLAs(t, resources)
 	require.Contains(t, clas, "foo.default:grpc")
@@ -62,7 +63,7 @@ func TestKubeEndpointToResources_XDSTPNamer(t *testing.T) {
 	s := newSnapshotterForTest()
 	ep := makeEndpoints("foo", "default", "10.0.0.1", "grpc", 50051)
 
-	resources := s.kubeEndpointToResources(ep, XDSTPNamer("alpha"))
+	resources := s.kubeEndpointToResources(ep, namer.XDSTPNamer("alpha"))
 
 	clas := indexCLAs(t, resources)
 	const xdstpClusterName = "xdstp://alpha/envoy.config.endpoint.v3.ClusterLoadAssignment/foo.default:grpc"
@@ -78,8 +79,8 @@ func TestKubeEndpointToResources_DualEmission_DistinctEntries(t *testing.T) {
 	s := newSnapshotterForTest()
 	ep := makeEndpoints("foo", "default", "10.0.0.1", "grpc", 50051)
 
-	local := s.kubeEndpointToResources(ep, LocalNamer())
-	xdstp := s.kubeEndpointToResources(ep, XDSTPNamer("alpha"))
+	local := s.kubeEndpointToResources(ep, namer.LocalNamer())
+	xdstp := s.kubeEndpointToResources(ep, namer.XDSTPNamer("alpha"))
 
 	// Both emissions must produce a CLA — the per-endpoint cache must not
 	// collapse them into one despite sharing the same Kubernetes object.
@@ -104,8 +105,8 @@ func TestKubeEndpointToResources_CacheReuseOnSameNamerAndVersion(t *testing.T) {
 	s := newSnapshotterForTest()
 	ep := makeEndpoints("foo", "default", "10.0.0.1", "grpc", 50051)
 
-	first := s.kubeEndpointToResources(ep, LocalNamer())
-	second := s.kubeEndpointToResources(ep, LocalNamer())
+	first := s.kubeEndpointToResources(ep, namer.LocalNamer())
+	second := s.kubeEndpointToResources(ep, namer.LocalNamer())
 
 	// Same object, same version, same namer → cache returns the same slice
 	// header. (The cache exists to avoid re-marshalling identical state.)

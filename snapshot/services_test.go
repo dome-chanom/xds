@@ -10,6 +10,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wongnai/xds/snapshot/namer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -56,7 +57,7 @@ func extractInlineRouteConfig(t *testing.T, l *listenerv3.Listener) *routev3.Rou
 
 func TestKubeServicesToResources_LocalNamer(t *testing.T) {
 	svc := makeService("foo", "default", "grpc", 50051)
-	resources := kubeServicesToResources([]*corev1.Service{svc}, LocalNamer())
+	resources := kubeServicesToResources([]*corev1.Service{svc}, namer.LocalNamer())
 
 	listeners, routes, clusters := indexResources(t, resources)
 
@@ -78,7 +79,7 @@ func TestKubeServicesToResources_LocalNamer(t *testing.T) {
 
 func TestKubeServicesToResources_XDSTPNamer(t *testing.T) {
 	svc := makeService("foo", "default", "grpc", 50051)
-	resources := kubeServicesToResources([]*corev1.Service{svc}, XDSTPNamer("alpha"))
+	resources := kubeServicesToResources([]*corev1.Service{svc}, namer.XDSTPNamer("alpha"))
 
 	listeners, routes, clusters := indexResources(t, resources)
 
@@ -116,7 +117,7 @@ func TestBuildServiceResources_DualEmissionContainsBothNameSpaces(t *testing.T) 
 
 	merged, _ := buildServiceResources(
 		[]*corev1.Service{svc},
-		[]Namer{LocalNamer(), XDSTPNamer("alpha")},
+		[]namer.Namer{namer.LocalNamer(), namer.XDSTPNamer("alpha")},
 	)
 
 	listeners, routes, clusters := indexResources(t, merged)

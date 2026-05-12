@@ -11,6 +11,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/v3"
 	"github.com/wongnai/xds/meter"
+	"github.com/wongnai/xds/snapshot/namer"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	corev1 "k8s.io/api/core/v1"
@@ -57,8 +58,8 @@ func (s *Snapshotter) startEndpoints(ctx context.Context) error {
 		endpoints := sliceToEndpoints(store.List())
 
 		var endpointsResources []types.Resource
-		for _, namer := range s.namers() {
-			endpointsResources = append(endpointsResources, s.kubeEndpointsToResources(endpoints, namer)...)
+		for _, n := range s.namers() {
+			endpointsResources = append(endpointsResources, s.kubeEndpointsToResources(endpoints, n)...)
 		}
 
 		hash, err := resourcesHash(endpointsResources)
@@ -96,25 +97,25 @@ func sliceToEndpoints(s []interface{}) []*corev1.Endpoints { //nolint:staticchec
 }
 
 // kubeEndpointsToResources convert list of Kubernetes endpoints to Endpoint
-// (ClusterLoadAssignment), naming each CLA via namer.NameEndpoint so the names
-// match the corresponding Cluster names emitted under the same namer.
-func (s *Snapshotter) kubeEndpointsToResources(endpoints []*corev1.Endpoints, namer Namer) []types.Resource { //nolint:staticcheck // We use deprecated API to support legacy Kubernetes
+// (ClusterLoadAssignment), naming each CLA via n.NameEndpoint so the names
+// match the corresponding Cluster names emitted under the same Namer.
+func (s *Snapshotter) kubeEndpointsToResources(endpoints []*corev1.Endpoints, n namer.Namer) []types.Resource { //nolint:staticcheck // We use deprecated API to support legacy Kubernetes
 	var out []types.Resource
 
 	for _, ep := range endpoints {
-		out = append(out, s.kubeEndpointToResources(ep, namer)...)
+		out = append(out, s.kubeEndpointToResources(ep, n)...)
 	}
 
 	return out
 }
 
-func (s *Snapshotter) kubeEndpointToResources(ep *corev1.Endpoints, namer Namer) []types.Resource { //nolint:staticcheck // We use deprecated API to support legacy Kubernetes
+func (s *Snapshotter) kubeEndpointToResources(ep *corev1.Endpoints, n namer.Namer) []types.Resource { //nolint:staticcheck // We use deprecated API to support legacy Kubernetes
 	name, err := k8scache.MetaNamespaceKeyFunc(ep)
 	if err != nil {
 		klog.Errorf("fail to get object key: %s", err)
 		return nil
 	}
-	cacheKey := namer.Scope() + ":" + name
+	cacheKey := n.Scope() + ":" + name
 	if val, ok := s.endpointResourceCache[cacheKey]; ok && val.version == ep.ResourceVersion {
 		return val.resources
 	}
@@ -131,7 +132,7 @@ func (s *Snapshotter) kubeEndpointToResources(ep *corev1.Endpoints, namer Namer)
 			}
 
 			cla := &endpointv3.ClusterLoadAssignment{
-				ClusterName: namer.NameEndpoint(portName),
+				ClusterName: n.NameEndpoint(portName),
 				Endpoints: []*endpointv3.LocalityLbEndpoints{
 					{
 						LoadBalancingWeight: wrapperspb.UInt32(1),

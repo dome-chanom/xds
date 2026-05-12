@@ -11,6 +11,7 @@ import (
 	managerv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
+	"github.com/wongnai/xds/snapshot/namer"
 	"google.golang.org/protobuf/types/known/anypb"
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -22,15 +23,6 @@ const PortName = "grpc"
 
 var nameRegex = regexp.MustCompile("^[a-z0-9][a-z0-9-]{0,63}$")
 
-// Namer transforms a resource's logical id into the wire-level name it is
-// emitted under. It mirrors snapshot.Namer; we declare it here as a small
-// interface to avoid an import cycle between snapshot and snapshot/apigateway.
-type Namer interface {
-	NameListener(id string) string
-	NameRouteConfig(id string) string
-	NameCluster(id string) string
-}
-
 // FromKubeServices generate
 // - Listener for each API Gateway (xds:///api-gateway-name)
 // - RouteConfiguration for those listeners
@@ -40,11 +32,11 @@ type Namer interface {
 // xds.lmwn.com/grpc-service: Comma-separated list of gRPC fully qualified service name (pkg.name.ServiceName)
 // and the service must have a port named "grpc"
 //
-// All emitted names and inter-resource references go through namer so the
+// All emitted names and inter-resource references go through n so the
 // resulting set is self-consistent under one naming namespace (local or
 // xdstp). Stats are keyed by the original (unprefixed) gateway name so that
 // metric labels stay stable across name spaces.
-func FromKubeServices(services []*v1.Service, namer Namer) ([]types.Resource, map[string]int) {
+func FromKubeServices(services []*v1.Service, n namer.Namer) ([]types.Resource, map[string]int) {
 	routerConfigs := map[string]*routev3.RouteConfiguration{}
 	gateways := map[string]*listenerv3.Listener{}
 
@@ -82,19 +74,19 @@ outer:
 			continue
 		}
 
-		clusterName := namer.NameCluster(fmt.Sprintf("%s.%s:%s", svc.Name, svc.Namespace, PortName))
+		clusterName := n.NameCluster(fmt.Sprintf("%s.%s:%s", svc.Name, svc.Namespace, PortName))
 
 		for _, gateway := range apiGateways {
 			if _, ok = gateways[gateway]; !ok {
 				gateways[gateway] = &listenerv3.Listener{
-					Name: namer.NameListener(gateway),
+					Name: n.NameListener(gateway),
 				}
 			}
 
 			routeConfig, ok := routerConfigs[gateway]
 			if !ok {
 				routeConfig = &routev3.RouteConfiguration{
-					Name: namer.NameRouteConfig(gateway),
+					Name: n.NameRouteConfig(gateway),
 					VirtualHosts: []*routev3.VirtualHost{
 						{
 							Name:    gateway,

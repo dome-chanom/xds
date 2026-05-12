@@ -8,17 +8,11 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/cache/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wongnai/xds/snapshot"
 	"github.com/wongnai/xds/snapshot/apigateway"
+	"github.com/wongnai/xds/snapshot/namer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// External test package (`apigateway_test`) so we can import `snapshot` —
-// snapshot imports apigateway at runtime, but external test packages are
-// compiled separately and can depend on packages that depend on the package
-// under test. This lets us exercise apigateway with the real Namer
-// implementations rather than handcrafted test doubles.
 
 func makeApigwService(name, ns, gateways, services string) *corev1.Service {
 	return &corev1.Service{
@@ -52,7 +46,7 @@ func splitByType(resources []types.Resource) (map[string]*listenerv3.Listener, m
 
 func TestFromKubeServices_LocalNamer(t *testing.T) {
 	svc := makeApigwService("backend", "default", "apigw1", "pkg.Service")
-	resources, stats := apigateway.FromKubeServices([]*corev1.Service{svc}, snapshot.LocalNamer())
+	resources, stats := apigateway.FromKubeServices([]*corev1.Service{svc}, namer.LocalNamer())
 
 	listeners, routes := splitByType(resources)
 
@@ -65,7 +59,7 @@ func TestFromKubeServices_LocalNamer(t *testing.T) {
 
 func TestFromKubeServices_XDSTPNamer(t *testing.T) {
 	svc := makeApigwService("backend", "default", "apigw1", "pkg.Service")
-	resources, stats := apigateway.FromKubeServices([]*corev1.Service{svc}, snapshot.XDSTPNamer("alpha"))
+	resources, stats := apigateway.FromKubeServices([]*corev1.Service{svc}, namer.XDSTPNamer("alpha"))
 
 	listeners, routes := splitByType(resources)
 

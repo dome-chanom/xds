@@ -1,4 +1,4 @@
-package snapshot
+package namer
 
 // LocalNamer returns the default-authority Namer — every method returns the
 // id unchanged. Use this when emitting resources under their bare names for

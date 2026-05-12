@@ -17,6 +17,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/wellknown"
 	"github.com/wongnai/xds/meter"
 	"github.com/wongnai/xds/snapshot/apigateway"
+	"github.com/wongnai/xds/snapshot/namer"
 	"go.opentelemetry.io/otel/metric"
 	"google.golang.org/protobuf/types/known/anypb"
 	corev1 "k8s.io/api/core/v1"
@@ -94,14 +95,14 @@ func sliceToService(s []interface{}) []*corev1.Service {
 // from the first namer's pass only — they're keyed by original gateway name
 // (namer-independent) so subsequent passes would just overwrite with the
 // same values.
-func buildServiceResources(services []*corev1.Service, namers []Namer) ([]types.Resource, map[string]int) {
+func buildServiceResources(services []*corev1.Service, namers []namer.Namer) ([]types.Resource, map[string]int) {
 	var merged []types.Resource
 	var apiGatewayStats map[string]int
 
-	for _, namer := range namers {
-		merged = append(merged, kubeServicesToResources(services, namer)...)
+	for _, n := range namers {
+		merged = append(merged, kubeServicesToResources(services, n)...)
 
-		gwResources, gwStats := apigateway.FromKubeServices(services, namer)
+		gwResources, gwStats := apigateway.FromKubeServices(services, n)
 		merged = append(merged, gwResources...)
 
 		if apiGatewayStats == nil {
@@ -117,9 +118,9 @@ func buildServiceResources(services []*corev1.Service, namers []Namer) ([]types.
 // - RouteConfiguration for those listeners
 // - Cluster
 //
-// Every name and inter-resource reference goes through namer so the resulting
-// set is self-consistent under one naming namespace (legacy or xdstp).
-func kubeServicesToResources(services []*corev1.Service, namer Namer) []types.Resource {
+// Every name and inter-resource reference goes through n so the resulting
+// set is self-consistent under one naming namespace (local or xdstp).
+func kubeServicesToResources(services []*corev1.Service, n namer.Namer) []types.Resource {
 	var out []types.Resource
 
 	router, _ := anypb.New(&routerv3.Router{})
@@ -130,9 +131,9 @@ func kubeServicesToResources(services []*corev1.Service, namer Namer) []types.Re
 			targetHostPort := net.JoinHostPort(fullName, port.Name)
 			targetHostPortNumber := net.JoinHostPort(fullName, strconv.Itoa(int(port.Port)))
 
-			listenerName := namer.NameListener(targetHostPortNumber)
-			routeConfigName := namer.NameRouteConfig(targetHostPortNumber)
-			clusterName := namer.NameCluster(targetHostPort)
+			listenerName := n.NameListener(targetHostPortNumber)
+			routeConfigName := n.NameRouteConfig(targetHostPortNumber)
+			clusterName := n.NameCluster(targetHostPort)
 
 			routeConfig := &routev3.RouteConfiguration{
 				Name: routeConfigName,
@@ -189,7 +190,7 @@ func kubeServicesToResources(services []*corev1.Service, namer Namer) []types.Re
 							Ads: &corev3.AggregatedConfigSource{},
 						},
 					},
-					ServiceName: namer.NameEndpoint(targetHostPort),
+					ServiceName: n.NameEndpoint(targetHostPort),
 				},
 			}
 

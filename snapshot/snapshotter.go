@@ -10,6 +10,7 @@ import (
 	"github.com/envoyproxy/go-control-plane/pkg/log"
 	"github.com/envoyproxy/go-control-plane/pkg/resource/v3"
 	"github.com/wongnai/xds/meter"
+	"github.com/wongnai/xds/snapshot/namer"
 	"go.opentelemetry.io/otel/metric"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/kubernetes"
@@ -109,11 +110,11 @@ func (s *Snapshotter) MuxCache() *cache.MuxCache {
 // its bare name. When localCluster is set, every resource is also emitted
 // under `xdstp://<localCluster>/...` so xdstp federation clients can reach
 // it via `xds://<localCluster>/foo` URLs.
-func (s *Snapshotter) namers() []Namer {
+func (s *Snapshotter) namers() []namer.Namer {
 	if s.localCluster == "" {
-		return []Namer{LocalNamer()}
+		return []namer.Namer{namer.LocalNamer()}
 	}
-	return []Namer{LocalNamer(), XDSTPNamer(s.localCluster)}
+	return []namer.Namer{namer.LocalNamer(), namer.XDSTPNamer(s.localCluster)}
 }
 
 func (s *Snapshotter) Start(stopCtx context.Context) error {
